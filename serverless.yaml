@@ -1,0 +1,68 @@
+service: ocorrencia-service
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: sa-east-1
+  environment:
+    ORACLE_USER:     ${env:ORACLE_USER}
+    ORACLE_PASSWORD: ${env:ORACLE_PASSWORD}
+    ORACLE_DSN:      ${env:ORACLE_DSN}
+
+layers:
+  oracleClient:
+    path: oracle-layer
+    compatibleRuntimes:
+      - python3.9
+
+functions:
+  createOcorrencia:
+    handler: handler/create.handler
+    layers:
+      - { Ref: OracleClientLambdaLayer }
+    events:
+      - httpApi:
+          path: /ocorrencia
+          method: post
+
+  listOcorrencias:
+    handler: handler/list.handler
+    layers:
+      - { Ref: OracleClientLambdaLayer }
+    events:
+      - httpApi:
+          path: /ocorrencia
+          method: get
+
+  updateOcorrencia:
+    handler: handler/update.handler
+    layers:
+      - { Ref: OracleClientLambdaLayer }
+    events:
+      - httpApi:
+          path: /ocorrencia/{id}
+          method: put
+
+  deleteOcorrencia:
+    handler: handler/delete.handler
+    layers:
+      - { Ref: OracleClientLambdaLayer }
+    events:
+      - httpApi:
+          path: /ocorrencia/{id}
+          method: delete
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    slim: true
+    strip: true
+    useDownloadCache: false
+    useStaticCache: false
+    noDeploy:
+      - boto3
+      - botocore
