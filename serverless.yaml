@@ -10,17 +10,9 @@ provider:
     ORACLE_PASSWORD: ${env:ORACLE_PASSWORD}
     ORACLE_DSN:      ${env:ORACLE_DSN}
 
-layers:
-  oracleClient:
-    path: oracle-layer
-    compatibleRuntimes:
-      - python3.9
-
 functions:
   createOcorrencia:
     handler: handler/create.handler
-    layers:
-      - { Ref: OracleClientLambdaLayer }
     events:
       - httpApi:
           path: /ocorrencia
@@ -28,8 +20,6 @@ functions:
 
   listOcorrencias:
     handler: handler/list.handler
-    layers:
-      - { Ref: OracleClientLambdaLayer }
     events:
       - httpApi:
           path: /ocorrencia
@@ -37,8 +27,6 @@ functions:
 
   updateOcorrencia:
     handler: handler/update.handler
-    layers:
-      - { Ref: OracleClientLambdaLayer }
     events:
       - httpApi:
           path: /ocorrencia/{id}
@@ -46,8 +34,6 @@ functions:
 
   deleteOcorrencia:
     handler: handler/delete.handler
-    layers:
-      - { Ref: OracleClientLambdaLayer }
     events:
       - httpApi:
           path: /ocorrencia/{id}
@@ -58,7 +44,7 @@ plugins:
 
 custom:
   pythonRequirements:
-    dockerizePip: false
+    dockerizePip: true
     slim: true
     strip: true
     useDownloadCache: false
