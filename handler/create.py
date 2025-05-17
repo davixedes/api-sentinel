@@ -1,54 +1,32 @@
 import json
-from .db import get_conn
+from .db import create_ocorrencia
 
 def handler(event, context):
     try:
-        if 'pathParameters' not in event or 'id' not in event['pathParameters']:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Parâmetro 'id' não fornecido"})
-            }
+        body = json.loads(event.get('body') or "{}")
 
-        occ_id = event['pathParameters']['id']
-        body = json.loads(event['body'])
+        # validações mínimas
+        required = ['tipo_ocorrencia', 'data_inicio', 'severidade_ocorrencia', 'id_estacao', 'id_cco']
+        for key in required:
+            if key not in body:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": f"Campo obrigatório '{key}' não fornecido"})
+                }
 
-        sql = """
-          UPDATE ocorrencia
-             SET tipo_ocorrencia       = :1,
-                 data_inicio           = TO_TIMESTAMP(:2, 'YYYY-MM-DD"T"HH24:MI:SS'),
-                 data_fim              = CASE WHEN :3 IS NULL THEN NULL ELSE TO_TIMESTAMP(:3, 'YYYY-MM-DD"T"HH24:MI:SS') END,
-                 severidade_ocorrencia = :4,
-                 fk_estacao_id_estacao = :5,
-                 fk_cco_id_cco         = :6,
-                 status_ocorrencia     = :7
-           WHERE id_ocorrencia = :8
-        """
+        new_id = create_ocorrencia(body)
 
-        params = (
-            body.get('tipo_ocorrencia'),
-            body.get('data_inicio'),
-            body.get('data_fim'),
-            body.get('data_fim'),  # Repetido devido ao CASE
-            body.get('severidade_ocorrencia'),
-            body.get('id_estacao'),
-            body.get('id_cco'),
-            body.get('status_ocorrencia'),
-            occ_id
-        )
+        return {
+            "statusCode": 201,
+            "body": json.dumps({"id_ocorrencia": new_id})
+        }
 
-        conn = get_conn()
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        conn.commit()
-
-        if cur.rowcount == 0:
-            return {
-                "statusCode": 404,
-                "body": json.dumps({"error": "Ocorrência não encontrada"})
-            }
-
-        return {"statusCode": 204, "body": ""}
-    
+    except ValueError as ve:
+        # falha em conversão de tipo
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": str(ve)})
+        }
     except Exception as e:
         return {
             "statusCode": 500,
