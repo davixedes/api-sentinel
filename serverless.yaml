@@ -12,33 +12,69 @@ provider:
 
 functions:
   createOcorrencia:
-    handler: handler/create.handler
+    handler: ocorrencia/handler/create.handler
     events:
       - httpApi:
           path: /ocorrencia
           method: post
 
   listOcorrencias:
-    handler: handler/list.handler
+    handler: ocorrencia/handler/list.handler
     events:
       - httpApi:
           path: /ocorrencia
           method: get
 
   updateOcorrencia:
-    handler: handler/update.handler
+    handler: ocorrencia/handler/update.handler
     events:
       - httpApi:
           path: /ocorrencia/{id}
           method: put
 
   deleteOcorrencia:
-    handler: handler/delete.handler
+    handler: ocorrencia/handler/delete.handler
     events:
       - httpApi:
           path: /ocorrencia/{id}
           method: delete
+  
 
+  createFuncionario:
+    handler: funcionario/handler/create.handler
+    events:
+      - httpApi:
+          path: /funcionario
+          method: post
+
+
+  listFuncionario:
+    handler: funcionario/handler/list.handler
+    events:
+      - httpApi:
+          path: /funcionario
+          method: get
+
+  updateFuncionario:
+    handler: funcionario/handler/update.handler
+    events:
+      - httpApi:
+          path: /funcionario/{id}
+          method: put
+
+  deleteFuncionario:
+    handler: funcionario/handler/delete.handler
+    events:
+      - httpApi:
+          path: /funcionario/{id}
+          method: delete
+
+  getFuncionario:
+    handler: funcionario/handler/get.handler
+    events:
+      - httpApi:
+          path: /funcionario/{id}
+          method: post
 plugins:
   - serverless-python-requirements
 
