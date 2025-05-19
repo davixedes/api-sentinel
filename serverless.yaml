@@ -1,14 +1,14 @@
 service: ocorrencia-service
-frameworkVersion: '4'
+frameworkVersion: "4"
 
 provider:
   name: aws
   runtime: python3.9
   region: sa-east-1
   environment:
-    ORACLE_USER:     ${env:ORACLE_USER}
+    ORACLE_USER: ${env:ORACLE_USER}
     ORACLE_PASSWORD: ${env:ORACLE_PASSWORD}
-    ORACLE_DSN:      ${env:ORACLE_DSN}
+    ORACLE_DSN: ${env:ORACLE_DSN}
 
 functions:
   createOcorrencia:
@@ -44,11 +44,14 @@ plugins:
 
 custom:
   pythonRequirements:
-    dockerizePip: true
+    dockerizePip: true # usa container AL2 + Python3.9
+    dockerImage: public.ecr.aws/sam/build-python3.9:latest-x86_64
+    dockerPlatform: linux/amd64
     slim: true
     strip: true
     useDownloadCache: false
     useStaticCache: false
+    pythonBin: python3.9
     noDeploy:
       - boto3
       - botocore
