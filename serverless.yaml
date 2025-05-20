@@ -39,6 +39,13 @@ functions:
           path: /ocorrencia/{id}
           method: delete
   
+  getOcorrencia:
+    handler: ocorrencia/handler/get.handler
+    events: 
+      - httpApi:
+        path: /ocorrencia/{id}
+        method: get
+  
 
   createFuncionario:
     handler: funcionario/handler/create.handler
@@ -78,10 +85,40 @@ functions:
   
   createAtendimento:
     handler: atendimento/handler/create.handler
-    events
+    events:
       - httpApi:
-          path: atendimento
+          path: /atendimento
           method: put
+  
+  listAtendimento: 
+    handler: atendimento/handler/list.handler
+    events:
+      - httpApi:
+          path: /atendimento
+          method: get
+  
+  updateAtendimento:
+    handler: atendimento/handler/update.handler
+    events:
+      - httpApi:
+          path: /atendimento/{id}
+          method: post
+
+  deleteAtendimento:
+    handler: atendimento/handler/delete.handler
+    events:
+      - httpApi:
+        path: /atendimento/{id}
+        method: delete
+
+  getAtendimento:
+    handler: atendimento/handler/get.handler
+    events:
+      - httpApi:
+        path: /atendimento/{id}
+        method: get
+
+
 plugins:
   - serverless-python-requirements
 
