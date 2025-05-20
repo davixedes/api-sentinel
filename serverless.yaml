@@ -74,7 +74,14 @@ functions:
     events:
       - httpApi:
           path: /funcionario/{id}
-          method: post
+          method: get
+  
+  createAtendimento:
+    handler: atendimento/handler/create.handler
+    events
+      - httpApi:
+          path: atendimento
+          method: put
 plugins:
   - serverless-python-requirements
 
