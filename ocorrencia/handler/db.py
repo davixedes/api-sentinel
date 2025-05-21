@@ -1,133 +1,166 @@
+# ocorrencia/handler/db.py
+
 import os
 import oracledb
+from datetime import datetime, date
 
 def get_conn():
+    """Retorna uma conexão aberta com o Oracle."""
     try:
-        conn = oracledb.connect(
+        return oracledb.connect(
             user=os.environ['ORACLE_USER'],
             password=os.environ['ORACLE_PASSWORD'],
             dsn=os.environ['ORACLE_DSN']
         )
-        return conn
     except oracledb.Error as e:
         print("Erro ao conectar:", e)
         raise
 
-def create_ocorrencia(payload: dict) -> int:
+def _to_iso(val):
+    """Converte DATE/TIMESTAMP Oracle para ISO-8601 ou None."""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.isoformat(timespec="seconds")
+    if isinstance(val, date):
+        return datetime.combine(val, datetime.min.time()).isoformat(timespec="seconds")
+    return str(val)
+
+def create_ocorrencia(payload: dict):
     """
     Insere uma ocorrência e retorna o id gerado pelo IDENTITY.
-    Espera as chaves:
-      - tipo_ocorrencia (str)
-      - data_inicio      (str ISO 'YYYY-MM-DD"T"HH24:MI:SS')
-      - data_fim         (str ISO ou None)
-      - severidade_ocorrencia (int)
-      - id_estacao       (int)
-      - id_cco           (int)
-      - status_ocorrencia(str)
+    Expect: tipo_ocorrencia, data_inicio, data_fim (opt), severidade_ocorrencia,
+            id_estacao, id_cco, status_ocorrencia (opt)
     """
     sql = """
     INSERT INTO ocorrencia (
-        tipo_ocorrencia,
-        data_inicio,
-        data_fim,
-        severidade_ocorrencia,
-        fk_estacao_id_estacao,
-        fk_cco_id_cco,
-        status_ocorrencia
+      tipo_ocorrencia,
+      data_inicio,
+      data_fim,
+      severidade_ocorrencia,
+      fk_estacao_id_estacao,
+      fk_cco_id_cco,
+      status_ocorrencia
     ) VALUES (
-        :1,
-        TO_TIMESTAMP(:2, 'YYYY-MM-DD"T"HH24:MI:SS'),
-        CASE WHEN :3 IS NULL THEN NULL 
-             ELSE TO_TIMESTAMP(:3, 'YYYY-MM-DD"T"HH24:MI:SS') END,
-        :4,
-        :5,
-        :6,
-        :7
+      :tipo,
+      TO_TIMESTAMP(:data_inicio, 'YYYY-MM-DD"T"HH24:MI:SS'),
+      CASE WHEN :data_fim IS NULL THEN NULL
+           ELSE TO_TIMESTAMP(:data_fim, 'YYYY-MM-DD"T"HH24:MI:SS') END,
+      :severidade,
+      :id_estacao,
+      :id_cco,
+      :status
     )
-    RETURNING id_ocorrencia INTO :8
+    RETURNING id_ocorrencia INTO :id_out
     """
-
     conn = get_conn()
     cur = conn.cursor()
+    id_out = cur.var(oracledb.DB_TYPE_NUMBER)
 
-    # variavel de saída para o RETURNING
-    id_var = cur.var(oracledb.DB_TYPE_NUMBER)
+    binds = {
+        "tipo":       payload["tipo_ocorrencia"],
+        "data_inicio":payload["data_inicio"],
+        "data_fim":   payload.get("data_fim"),
+        "severidade": int(payload["severidade_ocorrencia"]),
+        "id_estacao": int(payload["id_estacao"]),
+        "id_cco":     int(payload["id_cco"]),
+        "status":     payload.get("status_ocorrencia", "ABERTO"),
+        "id_out":     id_out,
+    }
 
-    params = (
-        payload['tipo_ocorrencia'],
-        payload['data_inicio'],
-        payload.get('data_fim'),
-        int(payload['severidade_ocorrencia']),
-        int(payload['id_estacao']),
-        int(payload['id_cco']),
-        payload.get('status_ocorrencia', 'ABERTO'),
-        id_var
-    )
-
-    cur.execute(sql, params)
+    cur.execute(sql, binds)
     conn.commit()
+    return int(id_out.getvalue()[0])
 
-    # retorna o valor como int
-    return int(id_var.getvalue()[0])
-
-def update_ocorrencia(occ_id: int, payload: dict) -> int:
+def get_ocorrencia(occ_id: int):
     """
-    Atualiza uma ocorrência e retorna número de linhas alteradas.
+    Busca uma ocorrência por ID.
+    Retorna dict ou None.
     """
     sql = """
-    UPDATE ocorrencia
-       SET tipo_ocorrencia       = :1,
-           data_inicio           = TO_TIMESTAMP(:2, 'YYYY-MM-DD"T"HH24:MI:SS'),
-           data_fim              = CASE WHEN :3 IS NULL THEN NULL 
-                                         ELSE TO_TIMESTAMP(:3, 'YYYY-MM-DD"T"HH24:MI:SS') END,
-           severidade_ocorrencia = :4,
-           fk_estacao_id_estacao = :5,
-           fk_cco_id_cco         = :6,
-           status_ocorrencia     = :7
-     WHERE id_ocorrencia = :8
+    SELECT
+      id_ocorrencia,
+      data_inicio,
+      data_fim,
+      tipo_ocorrencia,
+      descricao_ocorrencia,
+      severidade_ocorrencia,
+      fk_estacao_id_estacao AS id_estacao,
+      fk_cco_id_cco         AS id_cco,
+      status_ocorrencia
+    FROM ocorrencia
+    WHERE id_ocorrencia = :id
     """
-
     conn = get_conn()
     cur = conn.cursor()
+    cur.execute(sql, {"id": occ_id})
+    row = cur.fetchone()
+    if not row:
+        return None
 
-    params = (
-        payload['tipo_ocorrencia'],
-        payload['data_inicio'],
-        payload.get('data_fim'),
-        int(payload['severidade_ocorrencia']),
-        int(payload['id_estacao']),
-        int(payload['id_cco']),
-        payload.get('status_ocorrencia', 'ABERTO'),
-        occ_id
-    )
-
-    cur.execute(sql, params)
-    conn.commit()
-    return cur.rowcount
-
-
-def delete_ocorrencia(occ_id: int) -> int:
-    """
-    Remove a ocorrência de id fornecido.
-    Retorna o número de linhas deletadas.
-    """
-    sql = "DELETE FROM ocorrencia WHERE id_ocorrencia = :1"
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(sql, (occ_id,))
-    conn.commit()
-    return cur.rowcount
-
+    cols = [col[0].lower() for col in cur.description]
+    rec = dict(zip(cols, row))
+    # converte datas para ISO
+    rec["data_inicio"] = _to_iso(rec["data_inicio"])
+    rec["data_fim"]    = _to_iso(rec["data_fim"])
+    return rec
 
 def list_ocorrencias() -> list[dict]:
     """
-    Retorna todas as ocorrências como lista de dicionários.
+    Retorna todas as ocorrências como lista de dicts (com datas em ISO).
     """
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM ocorrencia")
     rows = cur.fetchall()
-    cols = [col[0] for col in cur.description]
-    # Monta lista de dicts
-    ocorrencias = [dict(zip(cols, row)) for row in rows]
-    return ocorrencias
+    cols = [col[0].lower() for col in cur.description]
+    result = []
+    for row in rows:
+        rec = dict(zip(cols, row))
+        rec["data_inicio"] = _to_iso(rec["data_inicio"])
+        rec["data_fim"]    = _to_iso(rec["data_fim"])
+        result.append(rec)
+    return result
+
+def update_ocorrencia(occ_id: int, payload: dict):
+    """
+    Atualiza a ocorrência e retorna o número de linhas afetadas.
+    """
+    sql = """
+    UPDATE ocorrencia
+       SET tipo_ocorrencia       = :tipo,
+           data_inicio           = TO_TIMESTAMP(:data_inicio, 'YYYY-MM-DD"T"HH24:MI:SS'),
+           data_fim              = CASE WHEN :data_fim IS NULL THEN NULL
+                                      ELSE TO_TIMESTAMP(:data_fim, 'YYYY-MM-DD"T"HH24:MI:SS') END,
+           severidade_ocorrencia = :severidade,
+           fk_estacao_id_estacao = :id_estacao,
+           fk_cco_id_cco         = :id_cco,
+           status_ocorrencia     = :status
+     WHERE id_ocorrencia         = :id
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    binds = {
+      "tipo":        payload["tipo_ocorrencia"],
+      "data_inicio": payload["data_inicio"],
+      "data_fim":    payload.get("data_fim"),
+      "severidade":  int(payload["severidade_ocorrencia"]),
+      "id_estacao":  int(payload["id_estacao"]),
+      "id_cco":      int(payload["id_cco"]),
+      "status":      payload.get("status_ocorrencia", "ABERTO"),
+      "id":          occ_id,
+    }
+    cur.execute(sql, binds)
+    conn.commit()
+    return cur.rowcount
+
+def delete_ocorrencia(occ_id: int):
+    """
+    Deleta a ocorrência e retorna o número de linhas deletadas.
+    """
+    sql = "DELETE FROM ocorrencia WHERE id_ocorrencia = :id"
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(sql, {"id": occ_id})
+    conn.commit()
+    return cur.rowcount
