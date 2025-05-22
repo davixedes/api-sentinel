@@ -1,137 +1,262 @@
 service: ocorrencia-service
-frameworkVersion: "4"
+frameworkVersion: "3"
 
+# Faz o Framework só avisar quando encontrar chaves
+# que vêm de plugins (evita “unrecognized property”)
+configValidationMode: warn
+
+###########################
+#  PROVEDOR (AWS)        ##
+###########################
 provider:
-  name: aws
+  name:    aws
   runtime: python3.9
-  region: sa-east-1
-  environment:
-    ORACLE_USER: ${env:ORACLE_USER}
-    ORACLE_PASSWORD: ${env:ORACLE_PASSWORD}
-    ORACLE_DSN: ${env:ORACLE_DSN}
+  region:  sa-east-1
 
+  environment:
+    ORACLE_USER:     ${env:ORACLE_USER}
+    ORACLE_PASSWORD: ${env:ORACLE_PASSWORD}
+    ORACLE_DSN:      ${env:ORACLE_DSN}
+
+###########################
+#      PLUG-INS          ##
+###########################
+plugins:
+  - serverless-python-requirements
+  - serverless-openapi-documentation     # gera o Swagger
+
+custom:
+
+  # ---------- python-requirements ----------
+  pythonRequirements:
+    dockerizePip:   true
+    dockerImage:    public.ecr.aws/sam/build-python3.9:latest-x86_64
+    dockerPlatform: linux/amd64
+    slim:  true
+    strip: true
+    pythonBin: python3.9
+    noDeploy: [ boto3, botocore ]
+
+  # ---------- OpenAPI / Swagger ----------
+  documentation:
+    version: '1.0.0'
+    title:   Ocorrência Service API
+    description: |
+      CRUD de ocorrências (rotas documentadas).
+      As rotas de funcionário e atendimento serão adicionadas depois.
+    models:
+      # ----- INPUT -----
+      - name: OcorrenciaInput
+        contentType: application/json
+        schema:
+          type: object
+          required:
+            - tipo_ocorrencia
+            - data_inicio
+            - severidade_ocorrencia
+            - id_estacao
+            - id_cco
+          properties:
+            tipo_ocorrencia:       { type: string,  example: "Falha técnica" }
+            data_inicio:           { type: string,  format: date-time, example: "2025-05-20T11:00:00Z" }
+            data_fim:              { type: string,  format: date-time, nullable: true }
+            severidade_ocorrencia: { type: integer, minimum: 1, maximum: 5, example: 3 }
+            id_estacao:            { type: integer, example: 1 }
+            id_cco:                { type: integer, example: 1 }
+            status_ocorrencia:     { type: string, enum: [ABERTO, FECHADO], example: ABERTO }
+
+      # ----- OUTPUT (flatten – SEM $ref) -----
+      - name: Ocorrencia
+        contentType: application/json
+        schema:
+          type: object
+          required:
+            - id_ocorrencia
+            - tipo_ocorrencia
+            - data_inicio
+            - severidade_ocorrencia
+            - id_estacao
+            - id_cco
+          properties:
+            id_ocorrencia:         { type: integer, example: 42 }
+            tipo_ocorrencia:       { type: string }
+            data_inicio:           { type: string, format: date-time }
+            data_fim:              { type: string, format: date-time, nullable: true }
+            severidade_ocorrencia: { type: integer }
+            id_estacao:            { type: integer }
+            id_cco:                { type: integer }
+            status_ocorrencia:     { type: string }
+
+      # ----- ERRO -----
+      - name: Error
+        contentType: application/json
+        schema:
+          type: object
+          required: [ error ]
+          properties:
+            error: { type: string, example: "Registro não encontrado" }
+
+###########################
+#         FUNÇÕES        ##
+###########################
 functions:
+
+  # ========= OCORRÊNCIA =========
   createOcorrencia:
     handler: ocorrencia/handler/create.handler
     events:
-      - httpApi:
-          path: /ocorrencia
+      - http:
+          path:   /ocorrencias
           method: post
+          cors:   true
+    documentation:                        # <<-- agora no nível da função
+      summary:     Criar ocorrência
+      requestBody:
+        description: JSON com os campos da ocorrência
+        required:   true
+        bodyType:   OcorrenciaInput
+      responses:
+        "201": { description: Criado,            bodyType: Ocorrencia }
+        "400": { description: Payload inválido, bodyType: Error }
 
   listOcorrencias:
     handler: ocorrencia/handler/list.handler
     events:
-      - httpApi:
-          path: /ocorrencia
+      - http:
+          path:   /ocorrencias
           method: get
+          cors:   true
+    documentation:
+      summary: Listar ocorrências
+      responses:
+        "200": { description: Lista, bodyType: Ocorrencia }
+
+  getOcorrencia:
+    handler: ocorrencia/handler/get.handler
+    events:
+      - http:
+          path:   /ocorrencias/{id}
+          method: get
+          cors:   true
+    documentation:
+      summary: Obter ocorrência
+      pathParams:
+        - name: id
+          description: ID da ocorrência
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK,            bodyType: Ocorrencia }
+        "404": { description: Não encontrado, bodyType: Error }
 
   updateOcorrencia:
     handler: ocorrencia/handler/update.handler
     events:
-      - httpApi:
-          path: /ocorrencia/{id}
+      - http:
+          path:   /ocorrencias/{id}
           method: put
+          cors:   true
+    documentation:
+      summary: Atualizar ocorrência
+      pathParams:
+        - name: id
+          description: ID da ocorrência
+          required: true
+          schema: { type: integer }
+      requestBody:
+        description: Campos a atualizar
+        required:   true
+        bodyType:   OcorrenciaInput
+      responses:
+        "204": { description: Atualizado }
+        "404": { description: Não encontrado, bodyType: Error }
 
   deleteOcorrencia:
     handler: ocorrencia/handler/delete.handler
     events:
-      - httpApi:
-          path: /ocorrencia/{id}
+      - http:
+          path:   /ocorrencias/{id}
           method: delete
-  
-  getOcorrencia:
-    handler: ocorrencia/handler/get.handler
-    events: 
-      - httpApi:
-        path: /ocorrencia/{id}
-        method: get
-  
+          cors:   true
+    documentation:
+      summary: Excluir ocorrência
+      pathParams:
+        - name: id
+          description: ID da ocorrência
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: Deletado }
+        "404": { description: Não encontrado, bodyType: Error }
+
+  # ==== DEMAIS ROTAS (sem documentação) ====
 
   createFuncionario:
     handler: funcionario/handler/create.handler
     events:
       - httpApi:
-          path: /funcionario
+          path: /funcionarios
           method: post
 
-
-  listFuncionario:
+  listFuncionarios:
     handler: funcionario/handler/list.handler
     events:
       - httpApi:
-          path: /funcionario
+          path: /funcionarios
+          method: get
+
+  getFuncionario:
+    handler: funcionario/handler/get.handler
+    events:
+      - httpApi:
+          path: /funcionarios/{id}
           method: get
 
   updateFuncionario:
     handler: funcionario/handler/update.handler
     events:
       - httpApi:
-          path: /funcionario/{id}
+          path: /funcionarios/{id}
           method: put
 
   deleteFuncionario:
     handler: funcionario/handler/delete.handler
     events:
       - httpApi:
-          path: /funcionario/{id}
+          path: /funcionarios/{id}
           method: delete
 
-  getFuncionario:
-    handler: funcionario/handler/get.handler
-    events:
-      - httpApi:
-          path: /funcionario/{id}
-          method: get
-  
   createAtendimento:
     handler: atendimento/handler/create.handler
     events:
       - httpApi:
-          path: /atendimento
-          method: put
-  
-  listAtendimento: 
+          path: /atendimentos
+          method: post
+
+  listAtendimentos:
     handler: atendimento/handler/list.handler
     events:
       - httpApi:
-          path: /atendimento
+          path: /atendimentos
           method: get
-  
-  updateAtendimento:
-    handler: atendimento/handler/update.handler
-    events:
-      - httpApi:
-          path: /atendimento/{id}
-          method: post
-
-  deleteAtendimento:
-    handler: atendimento/handler/delete.handler
-    events:
-      - httpApi:
-        path: /atendimento/{id}
-        method: delete
 
   getAtendimento:
     handler: atendimento/handler/get.handler
     events:
       - httpApi:
-        path: /atendimento/{id}
-        method: get
+          path: /atendimentos/{funcId}/{ocorrId}
+          method: get
 
+  updateAtendimento:
+    handler: atendimento/handler/update.handler
+    events:
+      - httpApi:
+          path: /atendimentos/{funcId}/{ocorrId}
+          method: put
 
-plugins:
-  - serverless-python-requirements
-
-custom:
-  pythonRequirements:
-    dockerizePip: true # usa container AL2 + Python3.9
-    dockerImage: public.ecr.aws/sam/build-python3.9:latest-x86_64
-    dockerPlatform: linux/amd64
-    slim: true
-    strip: true
-    useDownloadCache: false
-    useStaticCache: false
-    pythonBin: python3.9
-    noDeploy:
-      - boto3
-      - botocore
+  deleteAtendimento:
+    handler: atendimento/handler/delete.handler
+    events:
+      - httpApi:
+          path: /atendimentos/{funcId}/{ocorrId}
+          method: delete

@@ -1,0 +1,86 @@
+openapi: 3.0.0
+components:
+  schemas:
+    OcorrenciaInput:
+      type: object
+      required:
+        - tipo_ocorrencia
+        - data_inicio
+        - severidade_ocorrencia
+        - id_estacao
+        - id_cco
+      properties:
+        tipo_ocorrencia:
+          type: string
+          example: Falha técnica
+        data_inicio:
+          type: string
+          format: date-time
+          example: '2025-05-20T11:00:00Z'
+        data_fim:
+          type: string
+          format: date-time
+          nullable: true
+        severidade_ocorrencia:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 3
+        id_estacao:
+          type: integer
+          example: 1
+        id_cco:
+          type: integer
+          example: 1
+        status_ocorrencia:
+          type: string
+          enum:
+            - ABERTO
+            - FECHADO
+          example: ABERTO
+    Ocorrencia:
+      type: object
+      required:
+        - id_ocorrencia
+        - tipo_ocorrencia
+        - data_inicio
+        - severidade_ocorrencia
+        - id_estacao
+        - id_cco
+      properties:
+        id_ocorrencia:
+          type: integer
+          example: 42
+        tipo_ocorrencia:
+          type: string
+        data_inicio:
+          type: string
+          format: date-time
+        data_fim:
+          type: string
+          format: date-time
+          nullable: true
+        severidade_ocorrencia:
+          type: integer
+        id_estacao:
+          type: integer
+        id_cco:
+          type: integer
+        status_ocorrencia:
+          type: string
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Registro não encontrado
+  securitySchemes: {}
+info:
+  title: Ocorrência Service API
+  description: |
+    CRUD de ocorrências (rotas documentadas).
+    As rotas de funcionário e atendimento serão adicionadas depois.
+  version: 1.0.0
+paths: {}

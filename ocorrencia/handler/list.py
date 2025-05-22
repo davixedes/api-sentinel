@@ -3,10 +3,10 @@ from .db import list_ocorrencias
 
 def handler(event, context):
     try:
-        todas = list_ocorrencias()
+        items = list_ocorrencias()
         return {
             "statusCode": 200,
-            "body": json.dumps(todas, default=str)
+            "body": json.dumps(items)
         }
     except Exception as e:
         return {
